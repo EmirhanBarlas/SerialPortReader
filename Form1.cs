@@ -24,14 +24,16 @@ namespace SerialPortReader
             try
             {
                 ComPort.Open();
-                label3.Text = "Port Açýldý";
-                timer1.Start();
+                label3.Text = "Port Açýldý"; // port açýlýnca göndereceði mesaj bu kýsýmda yer almaktadýr.
+                timer1.Start(); // timer'ý baþlatarak interval kýsmýndan verilerin ne kadar hýzlý ve kadar yavaþ gidebileceðini ayarlayabilirsiniz.
             }
             catch (Exception ex)
             {
-                label3.Text = ex.Message;
+                label3.Text = ex.Message; // hata mesajý döndüðü tektirde label3.Text'e yazdýracaktýr.
             }
         }
+
+        // verileri okuyup hesaplayan byte olarak çýktý veren kýsým.
         public static string calculateLRC(List<byte> bytes)
         {
             int LRC = 0;
@@ -42,6 +44,7 @@ namespace SerialPortReader
             return LRC.ToString("X");
         }
 
+        // Uygulama kapatýldýðýnda dönecek olan metodlar bu kýsýmda yer almaktadýr.
         private void Form1_FormClosing(object sender, FormClosingEventArgs e)
         {
             try
@@ -53,6 +56,7 @@ namespace SerialPortReader
                 label3.Text = ex.Message;
             }
         }
+        // Timer1 tick zamaný aktifleþmeye baþladýðý gibi çalýþacaktýr.
         private void timer1_Tick_1(object sender, EventArgs e)
         {
             try
