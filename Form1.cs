@@ -1,97 +1,101 @@
 using System;
 using System.IO.Ports;
-using System.Reflection.Emit;
-using System.Windows.Forms;
+using System.Text;
+using System.Globalization;
 
 namespace SerialPortReader
 {
-    public partial class Form1 : Form
+    public partial class Form1 : Form, IDisposable
     {
-        private SerialPort ComPort;
+        private readonly SerialPort _comPort;
 
         public Form1()
         {
             InitializeComponent();
 
-            ComPort = new SerialPort();
-            ComPort.PortName = "COM4";
-            ComPort.BaudRate = 9600;
-            ComPort.DataBits = 7;
-            ComPort.StopBits = StopBits.One;
-            ComPort.Parity = Parity.Even;
-            ComPort.ReadTimeout = 500;
-            ComPort.WriteTimeout = 500;
+            _comPort = new SerialPort
+            {
+                PortName = "COM4",
+                BaudRate = 9600,
+                DataBits = 7,
+                StopBits = StopBits.One,
+                Parity = Parity.Even,
+                ReadTimeout = 500,
+                WriteTimeout = 500
+            };
+
             try
             {
-                ComPort.Open();
-                label3.Text = "Port Açýldý"; // port açýlýnca göndereceði mesaj bu kýsýmda yer almaktadýr.
-                timer1.Start(); // timer'ý baþlatarak interval kýsmýndan verilerin ne kadar hýzlý ve kadar yavaþ gidebileceðini ayarlayabilirsiniz.
+                _comPort.Open();
+                label3.Text = "Port Açýldý";
+                this.Text = $"PORT AKTÝF: {_comPort.PortName}";
+                timer1.Start();
             }
             catch (Exception ex)
             {
-                label3.Text = ex.Message; // hata mesajý döndüðü tektirde label3.Text'e yazdýracaktýr.
+                LogError(ex);
             }
         }
 
-        // verileri okuyup hesaplayan byte olarak çýktý veren kýsým.
-        public static string calculateLRC(List<byte> bytes)
+        public static string CalculateLRC(List<byte> bytes)
         {
-            int LRC = 0;
-            for (int i = 0; i < bytes.Count; i++)
+            int lrc = 0;
+            foreach (var b in bytes)
             {
-                LRC = (byte)((LRC + bytes[i]) & 0xFF);
+                lrc = (byte)((lrc + b) & 0xFF);
             }
-            return LRC.ToString("X");
+            return lrc.ToString("X");
         }
 
-        // Uygulama kapatýldýðýnda dönecek olan metodlar bu kýsýmda yer almaktadýr.
         private void Form1_FormClosing(object sender, FormClosingEventArgs e)
         {
             try
             {
-                ComPort.Close();
+                _comPort.Close();
             }
             catch (Exception ex)
             {
-                label3.Text = ex.Message;
+                LogError(ex);
             }
         }
-        // Timer1 tick zamaný aktifleþmeye baþladýðý gibi çalýþacaktýr.
+
         private void timer1_Tick_1(object sender, EventArgs e)
         {
             try
             {
-                string gidenveri = "a01" + "4601" + "R00001";
-                List<byte> ascii = new List<byte>();
-                ascii.AddRange(System.Text.Encoding.ASCII.GetBytes(gidenveri));
-                ascii[0] = 0x02;
-                string asciilrc = calculateLRC(ascii);
-                ascii.AddRange(System.Text.Encoding.ASCII.GetBytes(asciilrc));
-                ascii.Add(0x03);
-                byte[] gidenveria = ascii.ToArray();
-                ComPort.Write(gidenveria, 0, gidenveria.Length);
-                string inputData = ComPort.ReadTo(Convert.ToString((Char)3));
-                int first = inputData.IndexOf("460") + 3;
-                int i = Int32.Parse(inputData.Substring(first, 4), System.Globalization.NumberStyles.HexNumber);
-                label1.Text = "R00001: " + Convert.ToString(i);
-                gidenveri = "a01" + "4601" + "R00000";
-                ascii = new List<byte>();
-                ascii.AddRange(System.Text.Encoding.ASCII.GetBytes(gidenveri));
-                ascii[0] = 0x02;
-                asciilrc = calculateLRC(ascii);
-                ascii.AddRange(System.Text.Encoding.ASCII.GetBytes(asciilrc));
-                ascii.Add(0x03);
-                gidenveria = ascii.ToArray();
-                ComPort.Write(gidenveria, 0, gidenveria.Length);
-                inputData = ComPort.ReadTo(Convert.ToString((Char)3));
-                first = inputData.IndexOf("460") + 3;
-                i = Int32.Parse(inputData.Substring(first, 4), System.Globalization.NumberStyles.HexNumber);
-                label2.Text = "R00000: " + Convert.ToString(i);
+                SendAndReceiveData("a01" + "4601" + "R00001", label1);
+                SendAndReceiveData("a01" + "4601" + "R00000", label2);
             }
             catch (Exception ex)
             {
-                label3.Text = ex.Message;
+                LogError(ex);
             }
+        }
+
+        private void SendAndReceiveData(string data, Label label)
+        {
+            var ascii = new List<byte>(System.Text.Encoding.ASCII.GetBytes(data));
+            ascii[0] = 0x02;
+            var lrc = CalculateLRC(ascii);
+            ascii.AddRange(System.Text.Encoding.ASCII.GetBytes(lrc));
+            ascii.Add(0x03);
+            var sendData = ascii.ToArray();
+
+            _comPort.Write(sendData, 0, sendData.Length);
+            var inputData = _comPort.ReadTo(Convert.ToString((Char)3));
+            var first = inputData.IndexOf("460") + 3;
+            var i = Int32.Parse(inputData.Substring(first, 4), System.Globalization.NumberStyles.HexNumber);
+            label.Text = $"R{data.Substring(10, 5)}: {i}";
+        }
+
+        private void LogError(Exception ex)
+        {
+            label3.Text = ex.Message;
+        }
+
+        public void Dispose()
+        {
+            _comPort.Dispose();
         }
     }
 }
